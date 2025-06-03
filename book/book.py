@@ -1,12 +1,20 @@
 import json
 import os.path
+import logging
 
 from urllib3 import disable_warnings
 
 disable_warnings()
-from requests import get
+from requests import get, post
 from concurrent.futures import ThreadPoolExecutor
+from bs4 import BeautifulSoup
+#from nova_act import NovaAct, BOOL_SCHEMA
 
+logging.basicConfig(
+    filename='book.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 class book:
     def __init__(self, file):
@@ -34,14 +42,54 @@ class book:
         }
 
         try:
-            status = get(url=abook.get('bookSourceUrl'), verify=False,
-                         headers=headers, timeout=timeout).status_code
+            result = get(url=abook.get('bookSourceUrl'), verify=False,
+                         headers=headers, timeout=timeout)
+            status = result.status_code
 
             if status == 200:
-                return {'book': abook, 'status': True}
+                # now check page content
+                soup = BeautifulSoup(result.text, 'html.parser')
+                form = soup.find('form')
+                if form is None:
+                    # no form found
+                    logging.warning(abook.get('bookSourceName') + ' ' + abook.get('bookSourceUrl') + ' No search field')
+                    return {'book': abook, 'status': False}
+                else:
+                    # check form method
+                    form_method = form.get('method', 'get').lower()
+                    action_url = form.get('action', abook.get('bookSourceUrl'))
+                    if not action_url.startswith('http'):
+                        action_url = abook.get('bookSourceUrl') + action_url
+                    # check form action
+                    form_data = {}
+
+                    # Fill in the form fields
+                    for input_tag in form.find_all('input'):
+                        input_name = input_tag.get('name')
+                        if input_name:
+                            form_data[input_name] = 'test'  # Replace 'test' with the desired value
+                    logging.info(abook.get('bookSourceName') + ' ' + abook.get('bookSourceUrl'))
+                    logging.info('Form data: ' + str(form_data))
+                    logging.info(abook.get('searchUrl'))
+                    # Submit the form
+                    if form_method == 'post':
+                        response = post(action_url, data=form_data, headers=headers, timeout=timeout, verify=False)
+                    else:
+                        response = get(action_url, params=form_data, headers=headers, timeout=timeout, verify=False)
+
+                    if response.status_code == 200:
+                        logging.info(abook.get('bookSourceName') + ' ' + abook.get('bookSourceUrl') + ' Form submitted successfully')
+                        return {'book': abook, 'status': True}
+                    else:
+                        logging.warning(abook.get('bookSourceName') + ' ' + abook.get('bookSourceUrl') + ' Form submission failed')
+                        return {'book': abook, 'status': False}
             else:
+                logging.warning(abook.get('bookSourceName') + ' ' + abook.get('bookSourceUrl') + ' Can not reach site')
                 return {'book': abook, 'status': False}
+
         except Exception as e:
+            logging.warning(abook.get('bookSourceName') + ' ' + abook.get('bookSourceUrl') + ' Can not reach site')
+            # 可能是网络问题
             return {'book': abook, 'status': False}
 
     def checkbooks(self, workers=16):

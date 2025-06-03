@@ -4,13 +4,10 @@ import time
 
 from book.book import book
 
-if __name__ == '__main__':
-    print("欢迎使用书源校验工具（VerifyBookSource v2.0）\n"
-          "作者：勿埋我心 - SkyQian\n"
-          "Github：https://github.com/Qiantigers/verifyBookSource\n"
-          "我的博客：https://www.skyqian.com\n"
-          f"{'-' * 16}")
 
+if __name__ == '__main__':
+    
+    
     mode = input('是否使用config.json文件？（不使用则通过命令行输入配置）（y/n）')
 
     # 判断是否进入命令行输入配置
@@ -39,6 +36,7 @@ if __name__ == '__main__':
 
         # 标记开始时间
         start_time = time.time()
+    
         books_res = books.checkbooks(workers=int(config.get('workers')))
 
         good = books_res.get('good')
